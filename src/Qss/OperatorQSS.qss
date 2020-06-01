@@ -1,0 +1,25 @@
+TerminalEdit {
+        color: rgb(175, 175, 175);
+        background: rgb(57, 58, 60);
+}
+
+QTabWidget::pane {
+        border: none;
+}
+QTabWidget::tab-bar {
+        alignment: left;
+}
+QTabBar::tab {
+        background: #FFF5EE;
+        color: black;
+        min-width: 30ex;
+        min-height: 10ex;
+}
+QTabBar::tab:hover {
+        background:rgb(255, 255, 255, 255);
+}
+QTabBar::tab:selected{
+        border-color: white;
+        background: #00BFFF;
+        color: white;
+}

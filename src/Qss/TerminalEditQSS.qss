@@ -1,0 +1,40 @@
+QWidget {
+        outline: 0px;
+        background: lightGray;
+}
+
+TerminalEdit {
+
+        color: rgb(175, 175, 175);
+        background: rgb(57, 58, 60);
+}
+
+QLineEdit {
+     border: 1px solid gray;
+     border-radius: 4px;
+     padding: 0 0;
+     background: gray;
+     color : white;
+     selection-background-color: rgb(4,113,206,220);
+}
+
+QPushButton{
+        border-radius: 4px;
+        border: none;
+        width: 75px;
+        height: 25px;
+}
+QPushButton:enabled {
+        background: rgb(68, 69, 73);
+        color: white;
+}
+QPushButton:!enabled {
+        background: rgb(100, 100, 100);
+        color: rgb(200, 200, 200);
+}
+QPushButton:enabled:hover{
+        background: rgb(85, 85, 85);
+}
+QPushButton:enabled:pressed{
+        background: rgb(80, 80, 80);
+}
