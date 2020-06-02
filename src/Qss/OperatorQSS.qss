@@ -3,17 +3,25 @@ TerminalEdit {
         background: rgb(57, 58, 60);
 }
 
+QWidget {
+        font-family: "Microsoft YaHei";
+}
+
 QTabWidget::pane {
         border: none;
 }
+
 QTabWidget::tab-bar {
         alignment: left;
 }
+
 QTabBar::tab {
+        font-family: "Microsoft YaHei";
+        font-weight: bold;
         background: #FFF5EE;
         color: black;
-        min-width: 30ex;
-        min-height: 10ex;
+        min-width: 25ex;
+        min-height: 8ex;
 }
 QTabBar::tab:hover {
         background:rgb(255, 255, 255, 255);

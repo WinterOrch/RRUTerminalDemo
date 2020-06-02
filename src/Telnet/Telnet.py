@@ -5,7 +5,7 @@ import time
 
 class Telnet:
     timeout = 2  # Timeout Set as 2 secs
-    delay = 0.1
+    delay = 0.6
 
     isTelnetOpened = False
 
@@ -16,6 +16,7 @@ class Telnet:
 
     def __init__(self):
         self.tn = telnetlib.Telnet()
+        self.warning = ''
 
     def lock_check(self):
         while self.locked:
@@ -33,11 +34,12 @@ class Telnet:
         except:
             logging.warning('%sTelnet Open Failed' % host_ip)
             return False
-        self.tn.read_until(b'login:', timeout=self.timeout)
-        self.tn.write(username.encode('ascii') + b'\n')
-
-        self.tn.read_until(b'Password:', timeout=self.timeout)
-        self.tn.write(password.encode('ascii') + b'\n')
+        if username is not None:
+            self.tn.read_until(b'login:', timeout=self.timeout)
+            self.tn.write(username.encode('ascii') + b'\n')
+        if password is not None:
+            self.tn.read_until(b'Password:', timeout=self.timeout)
+            self.tn.write(password.encode('ascii') + b'\n')
 
         time.sleep(self.delay)
 
@@ -45,12 +47,14 @@ class Telnet:
         self.locked = False
         '''Lock Out'''
 
-        if 'Login incorrect' not in response:
-            logging.info('%sLogin Succeeded as %s' % host_ip % username)
+        if 'incorrect' not in response:
+            logging.info('%s Login Succeeded as %s' % host_ip % username)
             self.isTelnetOpened = True
             return True
         else:
-            logging.warning('%sLogin Failed' % host_ip)
+            self.warning = response
+            logging.warning('%s Login Failed' % host_ip)
+            self.isTelnetOpened = False
             return False
 
     def logout(self):
@@ -72,3 +76,6 @@ class Telnet:
         self.locked = False
         '''UnLock'''
         return response
+
+    def get_warning(self):
+        return self.warning

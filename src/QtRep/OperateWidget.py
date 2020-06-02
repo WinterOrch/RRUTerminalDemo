@@ -29,7 +29,7 @@ class OperateWidget(QtWidgets.QWidget):
         self.versionEdit = QtWidgets.QLineEdit()
         self.versionEdit.setEnabled(False)
 
-        self.refreshButton = QtWidgets.QPushButton("Refresh")
+        self.refreshButton = QtWidgets.QPushButton("Version")
         self.refreshButton.setDisabled(True)
         self.rebootButton = QtWidgets.QPushButton("Reboot")
         self.rebootButton.setDisabled(True)
@@ -39,8 +39,7 @@ class OperateWidget(QtWidgets.QWidget):
         device_manage_layout.addWidget(self.versionEdit, 0, 2)
         device_manage_layout.addWidget(self.refreshButton, 0, 4)
         device_manage_layout.addWidget(self.rebootButton, 0, 5)
-        device_manage_layout.setContentsMargins(3, 3, 3, 3)
-        device_manage_layout.setSpacing(mainSpacing)
+        device_manage_layout.setContentsMargins(7, 7, 7, 7)
         '''END OF MANAGE PANE'''
 
         self.setStyleSheet(self.list_style)
@@ -82,6 +81,8 @@ class OperateWidget(QtWidgets.QWidget):
 
         self.device_setting.warningSignal.connect(self.send_warning)
 
+        self.saveButton.clicked.connect(self.test)
+
     def refresh_version(self):
         cmd = RRUCmd.get_version()
         self.emit_trans_signal(cmd)
@@ -116,8 +117,7 @@ class OperateWidget(QtWidgets.QWidget):
             return False
 
     def test(self):
-        self.versionEdit.setEnabled(False)
-        self.versionEdit.setText("NO STILL CAN")
+        self.set_connected(True)
 
     def send_warning(self, connect):
         self.warning(connect)
@@ -133,7 +133,8 @@ class OperateWidget(QtWidgets.QWidget):
         self.refreshButton.setEnabled(connect)
         self.rebootButton.setEnabled(connect)
 
-        self.device_setting.setEnabled(connect)
+        self.device_setting.refresh_all(connect)
+        self.offset_setting.setEnabled(connect)
         # TODO ADD other tab panes
 
     def get_option(self):

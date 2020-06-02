@@ -1,12 +1,18 @@
-import re
+import sys
+
+from PyQt5.QtWidgets import QApplication
+
+from src.QtRep.LeftTabWidget import LeftTabWidget
 
 
 def main():
-    text = "value="
+    app = QApplication(sys.argv)
+    app.setStyle('Fusion')
 
-    res = re.search(r'\d+', text)
+    main_wnd = LeftTabWidget()
+    main_wnd.show()
 
-    print(res)
+    app.exec()
 
 
 if __name__ == '__main__':

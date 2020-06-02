@@ -1,5 +1,6 @@
 class RRUCmd:
     cmd_type_str = ['2.6GHz', '3.5GHz', '4.9GHz', 'ipaddr']
+    slot_type_str = ['TDD', 'Special']
 
     @staticmethod
     def reboot():

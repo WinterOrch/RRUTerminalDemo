@@ -21,7 +21,7 @@ class LeftTabWidget(QWidget):
         super(LeftTabWidget, self).__init__()
         self.setObjectName('LeftTabWidget')
 
-        self.setWindowTitle('LeftTabWidget')
+        self.setWindowTitle('TerminalDemo')
         with open('../Qss/QListWidgetQSS.qss', 'r') as f:
             self.list_style = f.read()
 
@@ -69,13 +69,14 @@ class LeftTabWidget(QWidget):
 
         self.terminalWidget = TerminalWidget()
         self.right_widget.addWidget(self.terminalWidget)
-        self.loginWidget = LoginWidget()
+        self.loginWidget = LoginWidget(self)
         self.right_widget.addWidget(self.loginWidget)
         self.settingWidget = OperateWidget()
         self.right_widget.addWidget(self.settingWidget)
         '''Signal'''
         self.loginWidget.loginSignal.connect(self.settingWidget.set_connected)
         self.settingWidget.operateSignal.connect(self.terminalWidget.show_response)
+        self.loginWidget.loginWarningSignal.connect(self.terminalWidget.show_response)
         ''''''
 
         self._retranslate_ui()
@@ -95,6 +96,7 @@ class LeftTabWidget(QWidget):
 
 def main():
     app = QApplication(sys.argv)
+    app.setStyle('Fusion')
 
     main_wnd = LeftTabWidget()
     main_wnd.show()
