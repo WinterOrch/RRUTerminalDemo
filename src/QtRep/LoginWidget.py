@@ -1,7 +1,7 @@
 import os
 
 from PyQt5.QtCore import pyqtSignal
-from PyQt5.QtWidgets import QWidget, QLineEdit, QFormLayout, QVBoxLayout, QPushButton, QHBoxLayout
+from PyQt5.QtWidgets import QWidget
 
 from src.Telnet import JsonRep
 from src.Telnet.TelRepository import TelRepository
@@ -62,6 +62,7 @@ class LoginWidget(QWidget):
         self.getRxGainLabel = QtWidgets.QLabel("Password")
         self.passwordEdit = QtWidgets.QLineEdit()
         self.passwordEdit.setStyleSheet(valueEditStyle)
+        self.passwordEdit.setEchoMode(QtWidgets.QLineEdit.Password)
 
         self.user_pw_layout = QtWidgets.QGridLayout()
         self.user_pw_layout.addWidget(self.getTxGainLabel, 0, 0)
@@ -93,6 +94,10 @@ class LoginWidget(QWidget):
 
     def _add_signal(self):
         self.loginButton.clicked.connect(self.login)
+
+        self.passwordEdit.textChanged.connect(self.back_normal)
+        self.userEdit.textChanged.connect(self.back_normal)
+        self.hostEdit.textChanged.connect(self.back_normal)
 
     def _check_json(self):
         if os.access('../JSON/' + Telnet.json_filename + '.json', os.F_OK):
@@ -133,5 +138,25 @@ class LoginWidget(QWidget):
 
         JsonRep.save_by_json([{Telnet.json_dict[0]: host, Telnet.json_dict[1]: user, Telnet.json_dict[2]: password}])
 
-    def test_2(self):
-        self.loginButton.setStyleSheet("background-color: red; height: 90px")
+    def back_normal(self):
+        self.loginButton.setText("Login")
+        self.loginButton.setStyleSheet(setButtonStyle)
+
+    def test_login(self):
+        host = self.hostEdit.text().strip()
+        user = self.userEdit.text().strip()
+        password = self.passwordEdit.text().strip()
+        if TelRepository.telnet_instance.login(host, user, password):
+            self.loginButton.setStyleSheet("background-color: green; height: 90px")
+            self.loginButton.setText('Connected')
+
+            ver = TelRepository.telnet_instance.execute_command('VER')
+            print(ver)
+
+            # Save
+            if self.saveCheckBox.isChecked():
+                data = [{Telnet.json_dict[0]: host, Telnet.json_dict[1]: user, Telnet.json_dict[2]: password}]
+                JsonRep.save_by_json(data)
+        else:
+            self.loginButton.setStyleSheet("background-color: red; height: 90px")
+            self.loginButton.setText('Failed')

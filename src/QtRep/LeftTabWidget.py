@@ -1,7 +1,4 @@
-import sys
-
 from PyQt5 import QtCore, QtWidgets, QtGui
-from PyQt5.QtWidgets import QApplication
 from PyQt5.QtWidgets import QListWidget, QStackedWidget
 from PyQt5.QtWidgets import QWidget
 from PyQt5.QtWidgets import QHBoxLayout
@@ -55,24 +52,27 @@ class LeftTabWidget(QWidget):
         icon_terminal = QtGui.QIcon()
         icon_terminal.addPixmap(QtGui.QPixmap('../Icon/console-mod.png'))
         item_terminal.setIcon(icon_terminal)
-        self.left_widget.addItem(item_terminal)
+
         item_login = QtWidgets.QListWidgetItem()
         icon_login = QtGui.QIcon()
         icon_login.addPixmap(QtGui.QPixmap('../Icon/login-mod.png'))
         item_login.setIcon(icon_login)
-        self.left_widget.addItem(item_login)
+
         item_setting = QtWidgets.QListWidgetItem()
         icon_setting = QtGui.QIcon()
         icon_setting.addPixmap(QtGui.QPixmap('../Icon/setting-mod.png'))
         item_setting.setIcon(icon_setting)
-        self.left_widget.addItem(item_setting)
 
-        self.terminalWidget = TerminalWidget()
-        self.right_widget.addWidget(self.terminalWidget)
+        self.left_widget.addItem(item_login)
+        self.left_widget.addItem(item_setting)
+        self.left_widget.addItem(item_terminal)
+
         self.loginWidget = LoginWidget(self)
         self.right_widget.addWidget(self.loginWidget)
         self.settingWidget = OperateWidget()
         self.right_widget.addWidget(self.settingWidget)
+        self.terminalWidget = TerminalWidget()
+        self.right_widget.addWidget(self.terminalWidget)
         '''Signal'''
         self.loginWidget.loginSignal.connect(self.settingWidget.set_connected)
         self.settingWidget.operateSignal.connect(self.terminalWidget.show_response)
@@ -82,7 +82,7 @@ class LeftTabWidget(QWidget):
         self._retranslate_ui()
 
     def _retranslate_ui(self):
-        up_list_str = ['Terminal', 'Connect', 'Setting']
+        up_list_str = ['Connect', 'Setting', 'Terminal']
         for i in range(3):
             self.item = self.left_widget.item(i)
             self.item.setText(up_list_str[i])
@@ -92,17 +92,3 @@ class LeftTabWidget(QWidget):
     def closeEvent(self, a0: QtGui.QCloseEvent) -> None:
         if Telnet.isTelnetOpened:
             TelRepository.telnet_instance.logout()
-
-
-def main():
-    app = QApplication(sys.argv)
-    app.setStyle('Fusion')
-
-    main_wnd = LeftTabWidget()
-    main_wnd.show()
-
-    app.exec()
-
-
-if __name__ == '__main__':
-    main()

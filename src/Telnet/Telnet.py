@@ -5,7 +5,7 @@ import time
 
 class Telnet:
     timeout = 2  # Timeout Set as 2 secs
-    delay = 0.6
+    delay = 2
 
     isTelnetOpened = False
 
@@ -16,7 +16,15 @@ class Telnet:
 
     def __init__(self):
         self.tn = telnetlib.Telnet()
+        self.tn.set_debuglevel(2)
+        self.set_logger()
         self.warning = ''
+
+    @staticmethod
+    def set_logger():
+        logging.basicConfig(filename='../log/' + __name__ + '.log',
+                            format='[%(asctime)s-%(filename)s-%(levelname)s:%(message)s]', level=logging.DEBUG,
+                            filemode='a', datefmt='%Y-%m-%d %I:%M:%S %p')
 
     def lock_check(self):
         while self.locked:
@@ -29,30 +37,47 @@ class Telnet:
             self.logout()
         try:
             '''Lock'''
+            print('Try to open Telnet')
+            logging.debug('Try to open Telnet %s' % host_ip)
             self.locked = True
             self.tn.open(host_ip, port=23)
+            logging.debug('%s Telnet Opened' % host_ip)
         except:
-            logging.warning('%sTelnet Open Failed' % host_ip)
+            logging.warning('%s Telnet Open Failed' % host_ip)
+            self.warning = 'Telnet Open Failed'
             return False
+
         if username is not None:
-            self.tn.read_until(b'login:', timeout=self.timeout)
-            self.tn.write(username.encode('ascii') + b'\n')
+            logging.debug('Try to login as %s' % username)
+            self.tn.read_until(b'login:', timeout=5)
+            self.tn.write(username.encode('ascii') + b'\r')
+            logging.debug('Username input')
+
         if password is not None:
-            self.tn.read_until(b'Password:', timeout=self.timeout)
-            self.tn.write(password.encode('ascii') + b'\n')
+            logging.debug('Try to input password')
+            self.tn.read_until(b'password:', timeout=self.timeout)
+            logging.debug('Find assertion for password')
+            if len(password) == 0:
+                self.tn.write(b'\r')
+            else:
+                self.tn.write(password.encode('ascii') + b'\r')
+            logging.debug('Password input:  %s' % password)
 
         time.sleep(self.delay)
 
-        response = self.tn.read_very_eager().decode('ascii')
+        result = self.get_result()
+
+        # response = self.tn.read_very_eager().decode('ascii')
+        logging.debug(result)
         self.locked = False
         '''Lock Out'''
 
-        if 'incorrect' not in response:
-            logging.info('%s Login Succeeded as %s' % host_ip % username)
+        if 'incorrect' not in result and 'Failed' not in result:
+            logging.info('Login Succeeded')
             self.isTelnetOpened = True
             return True
         else:
-            self.warning = response
+            self.warning = result
             logging.warning('%s Login Failed' % host_ip)
             self.isTelnetOpened = False
             return False
@@ -70,12 +95,26 @@ class Telnet:
         self.lock_check()
         '''Lock'''
         self.locked = True
-        self.tn.write(command.encode('ascii') + b'\n')
+        self.tn.write(command.encode('ascii') + b'\r')
+        logging.info("send " + command)
         time.sleep(self.delay)
-        response = self.tn.read_very_eager().decode('ascii')
+        response = self.get_result()
+        logging.info("recv " + response)
         self.locked = False
         '''UnLock'''
         return response
 
     def get_warning(self):
         return self.warning
+
+    def get_result(self):
+        result = str()
+        a = []
+        while True:
+            b, c, d = self.tn.expect(a, timeout=1)
+            result = result + str(d, encoding="gbk")
+            if b == 0:
+                self.tn.write(r' ')
+            else:
+                break
+        return result

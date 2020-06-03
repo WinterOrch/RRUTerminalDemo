@@ -46,7 +46,7 @@ class OperateWidget(QtWidgets.QWidget):
         tab_widget = QtWidgets.QTabWidget()
 
         self.device_setting = DeviceTab(self)
-        self.device_setting.setDisabled(True)
+        self.device_setting.setDisabled(False)
         self.offset_setting = OffsetTab(self)
         self.offset_setting.setDisabled(True)
         tab_widget.addTab(self.device_setting, "Device")

@@ -6,11 +6,14 @@ from PyQt5.QtCore import pyqtSignal
 from src.Telnet.RRUCmd import RRUCmd
 from src.Telnet.RespFilter import RespFilter
 from src.Telnet.TelRepository import TelRepository
+from src.Tool.ValidCheck import ValidCheck
 
 displayValueStyle = "color:blue"
 displayValueTempStyle = "color:red"
 valueEditStyle = "height: 22px"
 setButtonStyle = "height: 90px"
+
+warningStyle = "height: 22px; background-color:orange;"
 
 pubSpacing = 10
 mainSpacing = 2
@@ -28,7 +31,7 @@ class DeviceTab(QtWidgets.QWidget):
 
         settingGroup = QtWidgets.QGroupBox("Device Setting")
 
-        self.getFrequencyLabel = QtWidgets.QLabel("Freq (kHz) ")
+        self.getFrequencyLabel = QtWidgets.QLabel("Freq (Hz) ")
         self.setFrequencyLabel = QtWidgets.QLabel("Set Freq")
         self.freqValueLabel = QtWidgets.QLabel("000000")
         self.freqValueLabel.setStyleSheet(displayValueStyle)
@@ -105,16 +108,20 @@ class DeviceTab(QtWidgets.QWidget):
 
         self.tdd_slot = ''
         self.s_slot = ''
-    
+
     def add_signal(self):
         self.setFreqButton.clicked.connect(self.send)
         self.typeComboBox.currentIndexChanged.connect(self.display_slot)
         self.setButton.clicked.connect(self.set_slot)
-        
+
+        self.freqEdit.textChanged.connect(self.freq_back2normal)
+        self.rxGainEdit.textChanged.connect(self.rx_back2normal)
+        self.txGainEdit.textChanged.connect(self.tx_back2normal)
+
     def send(self):
         freq2set = self.freqEdit.text().strip()
         if freq2set != self.freqValueLabel.text():
-            if valid_check(freq2set):
+            if ValidCheck.freq(freq2set):
                 self.freqValueLabel.setStyleSheet(displayValueTempStyle)
                 cmd = RRUCmd.config_frequency(self.parentWidget.get_option(), freq2set)
                 self.deviceTranSignal.emit(cmd)
@@ -122,8 +129,10 @@ class DeviceTab(QtWidgets.QWidget):
                 self.deviceRvdSignal.emit(res)
 
                 self.refresh_freq()
+            else:
+                self.freqValueLabel.setStyleSheet(warningStyle)
 
-        pass    # TODO Not done yet
+        pass  # TODO Not done yet
 
         txGain2set = self.freqEdit.text().strip()
         if txGain2set != self.freqValueLabel.text():
@@ -148,7 +157,7 @@ class DeviceTab(QtWidgets.QWidget):
                 self.refresh_rx_gain()
 
     def set_slot(self):
-        pass    # TODO ADD Valid Check and RRUCmd
+        pass  # TODO ADD Valid Check and RRUCmd
         slot2set = self.slotEdit.text().strip()
         if valid_check(slot2set):
             if self.typeComboBox.currentText() == RRUCmd.slot_type_str[0] and slot2set != self.tdd_slot:
@@ -181,7 +190,7 @@ class DeviceTab(QtWidgets.QWidget):
             self.warning("Frequency cannot be refreshed properly")
 
     def refresh_tx_gain(self):
-        pass    # TODO ADD Valid Check and RRUCmd
+        pass  # TODO ADD Valid Check and RRUCmd
         cmd = RRUCmd.get_tx_gain(self.parentWidget.get_option())
         self.deviceTranSignal.emit(cmd)
         res = TelRepository.telnet_instance.execute_command(cmd)
@@ -196,7 +205,7 @@ class DeviceTab(QtWidgets.QWidget):
             self.warning("Tx Gain cannot be got properly")
 
     def refresh_rx_gain(self):
-        pass    # TODO ADD Valid Check and RRUCmd
+        pass  # TODO ADD Valid Check and RRUCmd
         cmd = RRUCmd.get_rx_gain(self.parentWidget.get_option())
         self.deviceTranSignal.emit(cmd)
         res = TelRepository.telnet_instance.execute_command(cmd)
@@ -209,9 +218,9 @@ class DeviceTab(QtWidgets.QWidget):
             self.rxGainEdit.setText(str(value.group()))
         else:
             self.warning("Rx Gain cannot be got properly")
-            
+
     def refresh_s_slot(self):
-        pass    # TODO ADD Valid Check and RRUCmd
+        pass  # TODO ADD Valid Check and RRUCmd
         cmd = RRUCmd.get_s_slot(self.parentWidget.get_option())
         self.deviceTranSignal.emit(cmd)
         res = TelRepository.telnet_instance.execute_command(cmd)
@@ -223,9 +232,9 @@ class DeviceTab(QtWidgets.QWidget):
             self.display_slot()
         else:
             self.warning("Special Slot cannot be got properly")
-        
+
     def refresh_tdd_slot(self):
-        pass    # TODO ADD Valid Check and RRUCmd
+        pass  # TODO ADD Valid Check and RRUCmd
         cmd = RRUCmd.get_tdd_slot(self.parentWidget.get_option())
         self.deviceTranSignal.emit(cmd)
         res = TelRepository.telnet_instance.execute_command(cmd)
@@ -237,7 +246,7 @@ class DeviceTab(QtWidgets.QWidget):
             self.display_slot()
         else:
             self.warning("TDD Slot cannot be got properly")
-        
+
     def display_slot(self):
         if self.typeComboBox.currentText() == RRUCmd.slot_type_str[0]:
             self.slotEdit.setText(self.tdd_slot)
@@ -245,8 +254,7 @@ class DeviceTab(QtWidgets.QWidget):
             self.slotEdit.setText(self.s_slot)
 
     def test(self):
-        self.deviceTranSignal.emit(self.parentWidget.get_option())
-        self.deviceRvdSignal.emit("I'm fine")
+        print(ValidCheck.freq(self.freqEdit.text().strip()))
 
     def warning(self, info):
         self.warningSignal.emit(info)
@@ -261,6 +269,15 @@ class DeviceTab(QtWidgets.QWidget):
             # TODO ADD
 
         self.setEnabled(connect)
+
+    def freq_back2normal(self):
+        self.freqEdit.setStyleSheet(valueEditStyle)
+
+    def rx_back2normal(self):
+        self.rxGainEdit.setStyleSheet(valueEditStyle)
+
+    def tx_back2normal(self):
+        self.txGainEdit.setStyleSheet(valueEditStyle)
 
 
 # TODO 设定值合法性检验
