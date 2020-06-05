@@ -1,4 +1,10 @@
 class RRUCmd:
+
+    REBOOT = 0
+    VERSION = 1
+    GET_FREQUENCY = 2
+    SET_FREQUENCY = 3
+
     cmd_type_str = ['2.6GHz', '3.5GHz', '4.9GHz', 'ipaddr']
     slot_type_str = ['TDD', 'Special']
 

@@ -3,12 +3,13 @@ import re
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import pyqtSignal
 
+from src.QtRep.NonQSSStyle import NonQSSStyle
 from src.Telnet.RRUCmd import RRUCmd
 from src.Telnet.RespFilter import RespFilter
 from src.Telnet.TelRepository import TelRepository
+from src.Telnet.Thread.WorkThread import WorkThread
 from src.Tool.ValidCheck import ValidCheck
 
-displayValueStyle = "color:blue"
 displayValueTempStyle = "color:red"
 valueEditStyle = "height: 22px"
 setButtonStyle = "height: 90px"
@@ -25,6 +26,8 @@ class DeviceTab(QtWidgets.QWidget):
 
     warningSignal = pyqtSignal(str)
 
+    connectionOutSignal = pyqtSignal()
+
     def __init__(self, parent):
         super(DeviceTab, self).__init__()
         self.parentWidget = parent
@@ -34,7 +37,7 @@ class DeviceTab(QtWidgets.QWidget):
         self.getFrequencyLabel = QtWidgets.QLabel("Freq (Hz) ")
         self.setFrequencyLabel = QtWidgets.QLabel("Set Freq")
         self.freqValueLabel = QtWidgets.QLabel("000000")
-        self.freqValueLabel.setStyleSheet(displayValueStyle)
+        self.freqValueLabel.setStyleSheet(NonQSSStyle.displayValueStyle)
         self.freqEdit = QtWidgets.QLineEdit()
         self.freqEdit.setStyleSheet(valueEditStyle)
         self.setFreqButton = QtWidgets.QPushButton("Send")
@@ -43,14 +46,14 @@ class DeviceTab(QtWidgets.QWidget):
         self.getTxGainLabel = QtWidgets.QLabel("Tx Gain")
         self.setTxGainLabel = QtWidgets.QLabel("Set Gain")
         self.txGainValueLabel = QtWidgets.QLabel("000000")
-        self.txGainValueLabel.setStyleSheet(displayValueStyle)
+        self.txGainValueLabel.setStyleSheet(NonQSSStyle.displayValueStyle)
         self.txGainEdit = QtWidgets.QLineEdit()
         self.txGainEdit.setStyleSheet(valueEditStyle)
 
         self.getRxGainLabel = QtWidgets.QLabel("Rx Att")
         self.setRxGainLabel = QtWidgets.QLabel("Set Gain")
         self.rxGainValueLabel = QtWidgets.QLabel("000000")
-        self.rxGainValueLabel.setStyleSheet(displayValueStyle)
+        self.rxGainValueLabel.setStyleSheet(NonQSSStyle.displayValueStyle)
         self.rxGainEdit = QtWidgets.QLineEdit()
         self.rxGainEdit.setStyleSheet(valueEditStyle)
 
@@ -124,16 +127,18 @@ class DeviceTab(QtWidgets.QWidget):
             if ValidCheck.freq(freq2set):
                 self.freqValueLabel.setStyleSheet(displayValueTempStyle)
                 cmd = RRUCmd.config_frequency(self.parentWidget.get_option(), freq2set)
-                self.deviceTranSignal.emit(cmd)
-                res = TelRepository.telnet_instance.execute_command(cmd)
-                self.deviceRvdSignal.emit(res)
-
-                self.refresh_freq()
+                
+                thread_freq_set = WorkThread(self, RRUCmd.SET_FREQUENCY, cmd)
+                thread_freq_set.sigConnectionOut.connect(self.slot_connection_out_signal)
+                thread_freq_set.sigSetOK.connect(self.refresh_after_set)
+                thread_freq_set.start()
+                thread_freq_set.exec()
             else:
                 self.freqValueLabel.setStyleSheet(warningStyle)
 
         pass  # TODO Not done yet
 
+        '''
         txGain2set = self.freqEdit.text().strip()
         if txGain2set != self.freqValueLabel.text():
             if valid_check(txGain2set):
@@ -155,6 +160,7 @@ class DeviceTab(QtWidgets.QWidget):
                 self.deviceRvdSignal.emit(res)
 
                 self.refresh_rx_gain()
+        '''
 
     def set_slot(self):
         pass  # TODO ADD Valid Check and RRUCmd
@@ -177,20 +183,26 @@ class DeviceTab(QtWidgets.QWidget):
 
     def refresh_freq(self):
         cmd = RRUCmd.get_frequency(self.parentWidget.get_option())
-        self.deviceTranSignal.emit(cmd)
-        res = TelRepository.telnet_instance.execute_command(cmd)
-        self.deviceRvdSignal.emit(res)
 
-        value = RespFilter.value_filter(res, RespFilter.FREQUENCY_ASSERTION)
-        if value is not None:
-            self.freqValueLabel.setText(str(value.group()))
-            self.freqValueLabel.setStyleSheet(displayValueStyle)
-            self.freqEdit.setText(str(value.group()))
-        else:
-            self.warning("Frequency cannot be refreshed properly")
+        thread_freq_get = WorkThread(self, RRUCmd.GET_FREQUENCY, cmd)
+        thread_freq_get.sigConnectionOut.connect(self.slot_connection_out_signal)
+        thread_freq_get.sigGetRes.connect(self.refresh_resp_handler)
+        thread_freq_get.start()
+        thread_freq_get.exec()
+
+    def refresh_resp_handler(self, case, res):
+        if case == RRUCmd.GET_FREQUENCY:
+            value = RespFilter.value_filter(res, RespFilter.FREQUENCY_ASSERTION)
+            if value is not None:
+                self.freqValueLabel.setText(str(value.group()))
+                self.freqValueLabel.setStyleSheet(NonQSSStyle.displayValueStyle)
+                self.freqEdit.setText(str(value.group()))
+            else:
+                self.warning("Frequency cannot be refreshed properly")
+        # TODO ADD
 
     def refresh_tx_gain(self):
-        pass  # TODO ADD Valid Check and RRUCmd
+        # TODO ADD Valid Check and RRUCmd
         cmd = RRUCmd.get_tx_gain(self.parentWidget.get_option())
         self.deviceTranSignal.emit(cmd)
         res = TelRepository.telnet_instance.execute_command(cmd)
@@ -199,13 +211,13 @@ class DeviceTab(QtWidgets.QWidget):
         value = re.search(r'\d', res)
         if value is not None:
             self.txGainValueLabel.setText(str(value.group()))
-            self.txGainValueLabel.setStyleSheet(displayValueStyle)
+            self.txGainValueLabel.setStyleSheet(NonQSSStyle.displayValueStyle)
             self.txGainEdit.setText(str(value.group()))
         else:
             self.warning("Tx Gain cannot be got properly")
 
     def refresh_rx_gain(self):
-        pass  # TODO ADD Valid Check and RRUCmd
+        # TODO ADD Valid Check and RRUCmd
         cmd = RRUCmd.get_rx_gain(self.parentWidget.get_option())
         self.deviceTranSignal.emit(cmd)
         res = TelRepository.telnet_instance.execute_command(cmd)
@@ -214,13 +226,13 @@ class DeviceTab(QtWidgets.QWidget):
         value = re.search(r'\d', res)
         if value is not None:
             self.rxGainValueLabel.setText(str(value.group()))
-            self.rxGainValueLabel.setStyleSheet(displayValueStyle)
+            self.rxGainValueLabel.setStyleSheet(NonQSSStyle.displayValueStyle)
             self.rxGainEdit.setText(str(value.group()))
         else:
             self.warning("Rx Gain cannot be got properly")
 
     def refresh_s_slot(self):
-        pass  # TODO ADD Valid Check and RRUCmd
+        # TODO ADD Valid Check and RRUCmd
         cmd = RRUCmd.get_s_slot(self.parentWidget.get_option())
         self.deviceTranSignal.emit(cmd)
         res = TelRepository.telnet_instance.execute_command(cmd)
@@ -234,7 +246,7 @@ class DeviceTab(QtWidgets.QWidget):
             self.warning("Special Slot cannot be got properly")
 
     def refresh_tdd_slot(self):
-        pass  # TODO ADD Valid Check and RRUCmd
+        # TODO ADD Valid Check and RRUCmd
         cmd = RRUCmd.get_tdd_slot(self.parentWidget.get_option())
         self.deviceTranSignal.emit(cmd)
         res = TelRepository.telnet_instance.execute_command(cmd)
@@ -261,14 +273,25 @@ class DeviceTab(QtWidgets.QWidget):
 
     def refresh_all(self, connect):
         if connect:
-            self.refresh_freq()
-            self.refresh_tx_gain()
-            self.refresh_rx_gain()
-            self.refresh_s_slot()
-            self.refresh_tdd_slot()
-            # TODO ADD
-
+            self.refresh_all_value()
         self.setEnabled(connect)
+
+    def refresh_all_value(self):
+        if TelRepository.telnet_instance.isTelnetLogined:
+            self.refresh_freq()
+            # self.refresh_tx_gain()
+            # self.refresh_rx_gain()
+            # self.refresh_s_slot()
+            # self.refresh_tdd_slot()
+            # TODO ADD
+            
+    def refresh_after_set(self, connect):
+        if connect == RRUCmd.SET_FREQUENCY:
+            self.refresh_freq()
+        # TODO ADD
+
+    def slot_connection_out_signal(self):
+        self.connectionOutSignal.emit()
 
     def freq_back2normal(self):
         self.freqEdit.setStyleSheet(valueEditStyle)

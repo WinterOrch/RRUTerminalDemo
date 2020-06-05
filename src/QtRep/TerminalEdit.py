@@ -35,19 +35,19 @@ class TerminalEdit(QPlainTextEdit):
     # Slot for SIGNAL CURSOR POSITION CHANGED
     def todo_when_cursor_pos_changed(self):
         self.cursorPosFormer = self.cursorPosCurrent
-        print('formerPos')
-        print(self.cursorPosFormer)
+        # print('formerPos')
+        # print(self.cursorPosFormer)
 
         self.cursorPosCurrent = self.textCursor().position()
-        print('currentPos')
-        print(self.cursorPosCurrent)
+        # print('currentPos')
+        # print(self.cursorPosCurrent)
 
     # Slot for SIGNAL TEXT CHANGED
     def todo_when_text_changed(self):
         if self.cursorPosFormer < self.startOfValidCmd:
             self.startOfValidCmd = self.startOfValidCmd + self.cursorPosCurrent - self.cursorPosFormer
-        print('Valid')
-        print(self.startOfValidCmd)
+        # print('Valid')
+        # print(self.startOfValidCmd)
 
     def process_cmd_for_transmitting(self):
         content_split = self.toPlainText()[self.startOfValidCmd:].split('\n')
@@ -62,7 +62,7 @@ class TerminalEdit(QPlainTextEdit):
 
     # TODO: 默认只能通过 telnet open 进行登陆，否则会认为没登陆
     def is_telnet_opened(self):
-        return Telnet.isTelnetOpened
+        return Telnet.isTelnetLogined
 
     # TODO
     def warn_tel_not_opened(self):

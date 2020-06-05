@@ -13,6 +13,8 @@ mainSpacing = 2
 class OperateWidget(QtWidgets.QWidget):
     operateSignal = pyqtSignal(str)
 
+    connectionOutSignal = pyqtSignal()
+
     def __init__(self):
         super(OperateWidget, self).__init__()
 
@@ -46,7 +48,7 @@ class OperateWidget(QtWidgets.QWidget):
         tab_widget = QtWidgets.QTabWidget()
 
         self.device_setting = DeviceTab(self)
-        self.device_setting.setDisabled(False)
+        self.device_setting.setDisabled(True)
         self.offset_setting = OffsetTab(self)
         self.offset_setting.setDisabled(True)
         tab_widget.addTab(self.device_setting, "Device")
@@ -73,6 +75,7 @@ class OperateWidget(QtWidgets.QWidget):
         self.setLayout(mainLayout)
 
         '''Slot'''
+        self.optionComboBox.currentIndexChanged.connect(self.device_setting.refresh_all_value)
         self.rebootButton.clicked.connect(self.reboot)
         self.refreshButton.clicked.connect(self.refresh_version)
 
@@ -80,6 +83,8 @@ class OperateWidget(QtWidgets.QWidget):
         self.device_setting.deviceTranSignal.connect(self.emit_trans_signal)
 
         self.device_setting.warningSignal.connect(self.send_warning)
+
+        self.device_setting.connectionOutSignal.connect(self.slot_connection_out_signal)
 
         self.saveButton.clicked.connect(self.test)
 
@@ -102,12 +107,12 @@ class OperateWidget(QtWidgets.QWidget):
     def warning(info):
         msgBox = QtWidgets.QMessageBox()
 
-        msgBox.setWindowTitle('警告')
+        msgBox.setWindowTitle('Warning')
         msgBox.setIcon(QtWidgets.QMessageBox.Warning)
-        msgBox.setText('警告消息')
+        msgBox.setText('Information')
         msgBox.setInformativeText(info)
-        yes = msgBox.addButton('确定', QtWidgets.QMessageBox.AcceptRole)
-        no = msgBox.addButton('取消', QtWidgets.QMessageBox.RejectRole)
+        yes = msgBox.addButton('Yes', QtWidgets.QMessageBox.AcceptRole)
+        no = msgBox.addButton('No', QtWidgets.QMessageBox.RejectRole)
         msgBox.setDefaultButton(no)
 
         reply = msgBox.exec()
@@ -133,9 +138,16 @@ class OperateWidget(QtWidgets.QWidget):
         self.refreshButton.setEnabled(connect)
         self.rebootButton.setEnabled(connect)
 
-        self.device_setting.refresh_all(connect)
+        self.device_setting.setEnabled(connect)
         self.offset_setting.setEnabled(connect)
+        self.device_setting.refresh_all(connect)
         # TODO ADD other tab panes
 
     def get_option(self):
         return self.optionComboBox.currentText()
+
+    def set_option(self, connect):
+        self.optionComboBox.setCurrentIndex(connect)
+
+    def slot_connection_out_signal(self):
+        self.connectionOutSignal.emit()

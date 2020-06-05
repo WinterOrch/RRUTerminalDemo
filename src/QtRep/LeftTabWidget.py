@@ -77,6 +77,8 @@ class LeftTabWidget(QWidget):
         self.loginWidget.loginSignal.connect(self.settingWidget.set_connected)
         self.settingWidget.operateSignal.connect(self.terminalWidget.show_response)
         self.loginWidget.loginWarningSignal.connect(self.terminalWidget.show_response)
+        self.loginWidget.sinOption.connect(self.settingWidget.set_option)
+        self.settingWidget.connectionOutSignal.connect(self.loginWidget.health_failure)
         ''''''
 
         self._retranslate_ui()
@@ -90,5 +92,5 @@ class LeftTabWidget(QWidget):
             self.item.setTextAlignment(Qt.AlignCenter)
 
     def closeEvent(self, a0: QtGui.QCloseEvent) -> None:
-        if Telnet.isTelnetOpened:
+        if Telnet.isTelnetLogined:
             TelRepository.telnet_instance.logout()
