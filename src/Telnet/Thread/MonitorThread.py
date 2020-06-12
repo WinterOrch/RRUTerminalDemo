@@ -3,6 +3,8 @@ import time
 from PyQt5 import QtCore
 from src.Telnet.TelRepository import TelRepository
 
+monitorInv = 5
+
 
 class MonitorThread(QtCore.QThread):
     sinOut = QtCore.pyqtSignal()
@@ -16,7 +18,7 @@ class MonitorThread(QtCore.QThread):
 
     def run(self) -> None:
         while self.working:
-            time.sleep(20)
+            time.sleep(monitorInv)
             if TelRepository.telnet_instance.isTelnetLogined:
                 if not TelRepository.connection_check():
                     self.sinOut.emit()

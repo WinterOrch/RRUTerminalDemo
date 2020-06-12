@@ -1,6 +1,7 @@
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import pyqtSignal
 
+from src.QtRep.TabWidget.AxiRegTab import AxiRegTab
 from src.QtRep.TabWidget.OffsetTab import OffsetTab
 from src.QtRep.TerminalEdit import TerminalEdit
 from src.QtRep.TabWidget.DeviceTab import DeviceTab
@@ -12,8 +13,9 @@ mainSpacing = 2
 
 class OperateWidget(QtWidgets.QWidget):
     operateSignal = pyqtSignal(str)
-
     connectionOutSignal = pyqtSignal()
+
+    option = 0
 
     def __init__(self):
         super(OperateWidget, self).__init__()
@@ -24,10 +26,10 @@ class OperateWidget(QtWidgets.QWidget):
         '''MANAGE PANE'''
         device_manage_layout = QtWidgets.QGridLayout()
 
-        self.optionLabel = QtWidgets.QLabel("Option")
+        self.optionLabel = QtWidgets.QLabel("Ant Num")
         self.optionComboBox = QtWidgets.QComboBox()
-        for i in range(len(RRUCmd.cmd_type_str)):
-            self.optionComboBox.addItem(RRUCmd.cmd_type_str[i])
+        for i in range(RRUCmd.ant_num[OperateWidget.option]):
+            self.optionComboBox.addItem(str(i))
         self.versionEdit = QtWidgets.QLineEdit()
         self.versionEdit.setEnabled(False)
 
@@ -51,8 +53,11 @@ class OperateWidget(QtWidgets.QWidget):
         self.device_setting.setDisabled(True)
         self.offset_setting = OffsetTab(self)
         self.offset_setting.setDisabled(True)
+        self.axi_reg_setting = AxiRegTab(self)
+        self.axi_reg_setting.turn(False)         # TODO False if not for DEBUG
         tab_widget.addTab(self.device_setting, "Device")
         tab_widget.addTab(self.offset_setting, "Offset")
+        tab_widget.addTab(self.axi_reg_setting, "Axi Reg")
 
         self.browser = TerminalEdit()
 
@@ -75,16 +80,24 @@ class OperateWidget(QtWidgets.QWidget):
         self.setLayout(mainLayout)
 
         '''Slot'''
-        self.optionComboBox.currentIndexChanged.connect(self.device_setting.refresh_all_value)
+        self.optionComboBox.currentIndexChanged.connect(self.refresh_ant_num)
         self.rebootButton.clicked.connect(self.reboot)
         self.refreshButton.clicked.connect(self.refresh_version)
 
         self.device_setting.deviceRvdSignal.connect(self.emit_rvd_signal)
         self.device_setting.deviceTranSignal.connect(self.emit_trans_signal)
+        self.offset_setting.deviceRvdSignal.connect(self.emit_rvd_signal)
+        self.offset_setting.deviceTranSignal.connect(self.emit_trans_signal)
+        self.axi_reg_setting.deviceRvdSignal.connect(self.emit_rvd_signal)
+        self.axi_reg_setting.deviceTranSignal.connect(self.emit_trans_signal)
 
         self.device_setting.warningSignal.connect(self.send_warning)
+        self.offset_setting.warningSignal.connect(self.send_warning)
+        self.axi_reg_setting.warningSignal.connect(self.send_warning)
 
         self.device_setting.connectionOutSignal.connect(self.slot_connection_out_signal)
+        self.offset_setting.connectionOutSignal.connect(self.slot_connection_out_signal)
+        self.axi_reg_setting.connectionOutSignal.connect(self.slot_connection_out_signal)
 
         self.saveButton.clicked.connect(self.test)
 
@@ -111,7 +124,7 @@ class OperateWidget(QtWidgets.QWidget):
         msgBox.setIcon(QtWidgets.QMessageBox.Warning)
         msgBox.setText('Information')
         msgBox.setInformativeText(info)
-        yes = msgBox.addButton('Yes', QtWidgets.QMessageBox.AcceptRole)
+        msgBox.addButton('Yes', QtWidgets.QMessageBox.AcceptRole)
         no = msgBox.addButton('No', QtWidgets.QMessageBox.RejectRole)
         msgBox.setDefaultButton(no)
 
@@ -140,14 +153,32 @@ class OperateWidget(QtWidgets.QWidget):
 
         self.device_setting.setEnabled(connect)
         self.offset_setting.setEnabled(connect)
+        self.axi_reg_setting.turn(connect)
         self.device_setting.refresh_all(connect)
-        # TODO ADD other tab panes
+        self.offset_setting.refresh_all(connect)
 
-    def get_option(self):
+    @staticmethod
+    def get_option():
+        return RRUCmd.cmd_type_str[OperateWidget.option]
+
+    def get_ant_num(self):
         return self.optionComboBox.currentText()
 
     def set_option(self, connect):
-        self.optionComboBox.setCurrentIndex(connect)
+        OperateWidget.option = connect
+        self.device_setting.freqEdit.setPlaceholderText(self.device_setting.freqEditTip[connect])
+        self.optionComboBox.disconnect()
+        self.optionComboBox.clear()
+        for i in range(RRUCmd.ant_num[OperateWidget.option]):
+            self.optionComboBox.addItem(str(i))
+        self.optionComboBox.currentIndexChanged.connect(self.refresh_ant_num)
 
     def slot_connection_out_signal(self):
         self.connectionOutSignal.emit()
+
+    def refresh_ant_num(self):
+        self.device_setting.antenna_index = self.optionComboBox.currentIndex()
+        self.offset_setting.antenna_index = self.optionComboBox.currentIndex()
+
+        self.device_setting.refresh_ant_num()
+        self.offset_setting.refresh_ant_num()

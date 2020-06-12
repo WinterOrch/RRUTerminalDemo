@@ -5,7 +5,7 @@ valueEditStyle = "height: 22px"
 setButtonStyle = "height: 90px"
 
 pubSpacing = 10
-mainSpacing = 2
+mainSpacing = 20
 
 
 class LoginTab:
@@ -58,6 +58,6 @@ class LoginTab:
             mainLayout = QtWidgets.QVBoxLayout()
             mainLayout.addLayout(device_manage_layout)
             mainLayout.addWidget(userPwGroup)
-            mainLayout.setContentsMargins(1, 1, 1, 1)
+            mainLayout.setContentsMargins(5, 5, 5, 5)
             mainLayout.setSpacing(mainSpacing)
             self.setLayout(mainLayout)

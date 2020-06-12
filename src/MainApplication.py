@@ -21,6 +21,7 @@ def main():
     set_logger()
 
     main_wnd = LeftTabWidget()
+    main_wnd.resize(850, 570)
     main_wnd.show()
 
     app.exec()

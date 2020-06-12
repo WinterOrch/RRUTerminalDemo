@@ -52,13 +52,16 @@ class Telnet:
             self.warning = argument
             return False
 
-        if username is not None:
+        if username is not None and len(username) != 0:
             logging.debug('Try to login as %s' % username)
             self.tn.read_until(b'login:', timeout=self.timeout)
             self.tn.write(username.encode('ascii') + b'\r')
             logging.debug('Username input')
+        else:
+            self.locked = False
+            return False
 
-        if password is not None:
+        if password is not None and len(password) != 0:
             logging.debug('Try to input password')
             self.tn.read_until(b'password:', timeout=self.timeout)
             logging.debug('Find assertion for password')
@@ -67,6 +70,9 @@ class Telnet:
             else:
                 self.tn.write(password.encode('ascii') + return_symbol)
             logging.debug('Password input:  %s' % password)
+        else:
+            self.locked = False
+            return False
 
         time.sleep(self.delay)
 

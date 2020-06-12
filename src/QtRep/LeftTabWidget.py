@@ -75,6 +75,8 @@ class LeftTabWidget(QWidget):
         self.right_widget.addWidget(self.terminalWidget)
         '''Signal'''
         self.loginWidget.loginSignal.connect(self.settingWidget.set_connected)
+        self.loginWidget.ipTranSignal.connect(self.terminalWidget.show_response)
+        self.loginWidget.ipRecvSignal.connect(self.terminalWidget.show_response)
         self.settingWidget.operateSignal.connect(self.terminalWidget.show_response)
         self.loginWidget.loginWarningSignal.connect(self.terminalWidget.show_response)
         self.loginWidget.sinOption.connect(self.settingWidget.set_option)
