@@ -32,7 +32,7 @@ class Telnet:
 
     def lock_check(self):
         while self.locked:
-            time.sleep(0.05)
+            time.sleep(0.1)
 
     def login(self, host_ip, username, password):
         # Logout first if telnet opened already

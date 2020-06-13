@@ -1,5 +1,7 @@
 class RRUCmd:
 
+    DEBUG = -220
+
     FAIL = -1
     REBOOT = 0
     VERSION = 1

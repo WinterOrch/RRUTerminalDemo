@@ -4,3 +4,5 @@ class NonQSSStyle:
 
     warningStyle = "height: 22px; background-color:orange;"
     valueEditStyle = "height: 22px"
+
+    setButtonBigStyle = "height: 90px"

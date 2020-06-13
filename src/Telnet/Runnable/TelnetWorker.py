@@ -1,4 +1,5 @@
 import sys
+import time
 import traceback
 
 from PyQt5 import QtCore
@@ -26,10 +27,10 @@ class WorkerSignals(QtCore.QObject):
 
 
 class TelnetWorker(QtCore.QRunnable):
-    def __init__(self, parentWidget, case, s_cmd):
-        super(TelnetWorker, self).__init__()
-        self.parentWidget = parentWidget
+    test_lock = False
 
+    def __init__(self, case, s_cmd):
+        super(TelnetWorker, self).__init__()
         self.case = case  # Case Flag from RRUCmd.py
         self.cmd = s_cmd
         self.result = ""
@@ -93,7 +94,10 @@ class TelnetWorker(QtCore.QRunnable):
                 elif self.case == RRUCmd.SET_IP_ADDR:
                     self.set_value(self.cmd)
             else:
-                self.signals.connectionLost.emit()
+                if self.case == RRUCmd.DEBUG:
+                    self._debug_test(self.cmd)
+                else:
+                    self.signals.connectionLost.emit()
         except:
             traceback.print_exc()
             except_type, value = sys.exc_info()[:2]
@@ -108,6 +112,21 @@ class TelnetWorker(QtCore.QRunnable):
 
     def version(self, cmd):
         pass
+
+    def _debug_test(self, cmd):
+        while TelnetWorker.test_lock:
+            time.sleep(0.1)
+
+        TelnetWorker.test_lock = True
+        #   Execute and send Info to Sim-Console
+        self.signals.consoleDisplay.emit(WorkerSignals.TRAN_SIGNAL, self.cmd)
+
+        time.sleep(0.7)
+
+        self.result = "OK, GOT IT " + cmd
+
+        self.signals.consoleDisplay.emit(WorkerSignals.RECV_SIGNAL, self.result)
+        TelnetWorker.test_lock = False
 
     def get_value(self, cmd):
         #   Execute and send Info to Sim-Console

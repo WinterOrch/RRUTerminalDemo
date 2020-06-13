@@ -1,19 +1,17 @@
+import logging
+
 from PyQt5 import QtWidgets
-from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtCore import pyqtSignal, QThreadPool
 
 from src.QtRep.Component.ValueLabel import ValueLabel
 from src.QtRep.NonQSSStyle import NonQSSStyle
 from src.RRU.Antenna import Antenna
 from src.Telnet.RRUCmd import RRUCmd
 from src.Telnet.RespFilter import RespFilter
+from src.Telnet.Runnable.TelnetWorker import TelnetWorker, WorkerSignals
 from src.Telnet.TelRepository import TelRepository
 from src.Telnet.Thread.WorkThread import WorkThread
 from src.Tool.ValidCheck import ValidCheck
-
-valueEditStyle = "height: 22px"
-setButtonStyle = "height: 90px"
-
-warningStyle = "height: 22px; background-color:orange;"
 
 pubSpacing = 10
 mainSpacing = 2
@@ -35,7 +33,22 @@ class DeviceTab(QtWidgets.QWidget):
         self.mod_dimension = True
         self.auto_fresh = True
 
-        '''DEVICE SETTING PANE'''
+        self._init_ui()
+        self.add_signal()
+        self.set_logger()
+
+        self._init_bean()
+
+        self.debug_counter = 0
+
+    @staticmethod
+    def set_logger():
+        logging.basicConfig(filename='../log/' + __name__ + '.log',
+                            format='[%(asctime)s-%(filename)s-%(funcName)s-%(levelname)s:%(message)s]',
+                            level=logging.DEBUG, filemode='a', datefmt='%Y-%m-%d %I:%M:%S %p')
+
+    def _init_ui(self):
+        """DEVICE SETTING PANE"""
         settingGroup = QtWidgets.QGroupBox("Device Setting")
 
         self.getFrequencyLabel = QtWidgets.QLabel("Freq (Hz) ")
@@ -44,9 +57,9 @@ class DeviceTab(QtWidgets.QWidget):
         self.freqValueLabel.refreshSig.connect(self.quick_refresh)
         self.freqValueLabel.setStyleSheet(NonQSSStyle.displayValueStyle)
         self.freqEdit = QtWidgets.QLineEdit()
-        self.freqEdit.setStyleSheet(valueEditStyle)
+        self.freqEdit.setStyleSheet(NonQSSStyle.valueEditStyle)
         self.setFreqButton = QtWidgets.QPushButton("Send")
-        self.setFreqButton.setStyleSheet(setButtonStyle)
+        self.setFreqButton.setStyleSheet(NonQSSStyle.setButtonBigStyle)
         self.freqEditTip = ["(2.565 - 2.625 GHz, Correct to 1 Hz)", "(3.45 - 3.55 GHz, Correct to 1 Hz)",
                             "(4.85 - 4.95 GHz, Correct to 1 Hz)"]
         self.freqEdit.setPlaceholderText(self.freqEditTip[0])
@@ -60,7 +73,7 @@ class DeviceTab(QtWidgets.QWidget):
         self.txGainValueLabel.refreshSig.connect(self.quick_refresh)
         self.txGainValueLabel.setStyleSheet(NonQSSStyle.displayValueStyle)
         self.txGainEdit = QtWidgets.QLineEdit()
-        self.txGainEdit.setStyleSheet(valueEditStyle)
+        self.txGainEdit.setStyleSheet(NonQSSStyle.valueEditStyle)
         if self.mod_dimension:
             txGainTip = "(-41.95 - 0 dB, Correct to 0.001 dB)"
         else:
@@ -76,7 +89,7 @@ class DeviceTab(QtWidgets.QWidget):
         self.rxGainValueLabel.refreshSig.connect(self.quick_refresh)
         self.rxGainValueLabel.setStyleSheet(NonQSSStyle.displayValueStyle)
         self.rxGainEdit = QtWidgets.QLineEdit()
-        self.rxGainEdit.setStyleSheet(valueEditStyle)
+        self.rxGainEdit.setStyleSheet(NonQSSStyle.valueEditStyle)
         if self.mod_dimension:
             rxGainTip = "(-30 - 0 dB, Correct to 0.25 dB)"
         else:
@@ -137,14 +150,13 @@ class DeviceTab(QtWidgets.QWidget):
         mainLayout.addWidget(slot_setting_layout)
         mainLayout.addSpacing(mainSpacing)
         self.setLayout(mainLayout)
-
-        self.add_signal()
-
+        
+    def _init_bean(self):
         self.antenna_bean_arr = []
         for i in range(max(RRUCmd.ant_num)):
             self.antenna_bean_arr.append(Antenna())
         self.antenna_index = 0
-
+        
     def add_signal(self):
         self.setFreqButton.clicked.connect(self.send)
         self.typeComboBox.currentIndexChanged.connect(self.display_slot)
@@ -159,10 +171,34 @@ class DeviceTab(QtWidgets.QWidget):
         self.slotEdit.textChanged.connect(self.slot_back2normal)
         self.slotEdit.returnPressed.connect(self.set_slot)
 
+    def _console_slot(self, case, msg):
+        if case == WorkerSignals.TRAN_SIGNAL:
+            self.deviceTranSignal.emit(msg)
+        elif case == WorkerSignals.RECV_SIGNAL:
+            self.deviceRvdSignal.emit(msg)
+
     def send(self):
         self.set_freq()
         self.set_tx_gain()
         self.set_rx_gain()
+
+    def _debug_send(self):
+        cmd = "DEBUG"
+
+        thread = TelnetWorker(RRUCmd.DEBUG, cmd)
+        thread.signals.consoleDisplay.connect(self._console_slot)
+        thread.signals.connectionLost.connect(self.slot_connection_out_signal)
+        thread.signals.error.connect(self.log_error)
+        thread.signals.result.connect(self.get_resp_handler)
+        QThreadPool.globalInstance().start(thread)
+
+    def _process_get(self, cmd):
+        thread = TelnetWorker(RRUCmd.DEBUG, cmd)
+        thread.signals.consoleDisplay.connect(self._console_slot)
+        thread.signals.connectionLost.connect(self.slot_connection_out_signal)
+        thread.signals.error.connect(self.log_error)
+        thread.signals.result.connect(self.get_resp_handler)
+        QThreadPool.globalInstance().start(thread)
 
     def set_freq(self):
         freq2set = self.freqEdit.text().strip()
@@ -173,11 +209,11 @@ class DeviceTab(QtWidgets.QWidget):
 
                 thread_freq_set = WorkThread(self, RRUCmd.SET_FREQUENCY, cmd)
                 thread_freq_set.sigConnectionOut.connect(self.slot_connection_out_signal)
-                thread_freq_set.sigSetOK.connect(self.refresh_after_set)
+                thread_freq_set.sigSetOK.connect(self.set_resp_handler)
                 thread_freq_set.start()
                 thread_freq_set.exec()
             else:
-                self.freqEdit.setStyleSheet(warningStyle)
+                self.freqEdit.setStyleSheet(NonQSSStyle.warningStyle)
 
     def set_rx_gain(self):
         rxGain2set = self.rxGainEdit.text().strip()
@@ -195,11 +231,11 @@ class DeviceTab(QtWidgets.QWidget):
 
                 thread_rx_gain_set = WorkThread(self, RRUCmd.SET_RX_GAIN, cmd)
                 thread_rx_gain_set.sigConnectionOut.connect(self.slot_connection_out_signal)
-                thread_rx_gain_set.sigSetOK.connect(self.refresh_after_set)
+                thread_rx_gain_set.sigSetOK.connect(self.set_resp_handler)
                 thread_rx_gain_set.start()
                 thread_rx_gain_set.exec()
             else:
-                self.rxGainEdit.setStyleSheet(warningStyle)
+                self.rxGainEdit.setStyleSheet(NonQSSStyle.warningStyle)
 
     def set_tx_gain(self):
         txGain2set = self.txGainEdit.text().strip()
@@ -214,11 +250,11 @@ class DeviceTab(QtWidgets.QWidget):
 
                 thread_tx_atten_set = WorkThread(self, RRUCmd.SET_TX_ATTEN, cmd)
                 thread_tx_atten_set.sigConnectionOut.connect(self.slot_connection_out_signal)
-                thread_tx_atten_set.sigSetOK.connect(self.refresh_after_set)
+                thread_tx_atten_set.sigSetOK.connect(self.set_resp_handler)
                 thread_tx_atten_set.start()
                 thread_tx_atten_set.exec()
             else:
-                self.txGainEdit.setStyleSheet(warningStyle)
+                self.txGainEdit.setStyleSheet(NonQSSStyle.warningStyle)
 
     def set_slot(self):
         # TODO Valid Check not added yet
@@ -231,7 +267,7 @@ class DeviceTab(QtWidgets.QWidget):
 
                 thread_tdd_slot_set = WorkThread(self, RRUCmd.SET_TDD_SLOT, cmd)
                 thread_tdd_slot_set.sigConnectionOut.connect(self.slot_connection_out_signal)
-                thread_tdd_slot_set.sigSetOK.connect(self.refresh_after_set)
+                thread_tdd_slot_set.sigSetOK.connect(self.set_resp_handler)
                 thread_tdd_slot_set.start()
                 thread_tdd_slot_set.exec()
             elif self.typeComboBox.currentText() == RRUCmd.slot_type_str[1] and slot2set != self.slotValueLabel.text():
@@ -240,11 +276,11 @@ class DeviceTab(QtWidgets.QWidget):
 
                 thread_s_slot_set = WorkThread(self, RRUCmd.SET_S_SLOT, cmd)
                 thread_s_slot_set.sigConnectionOut.connect(self.slot_connection_out_signal)
-                thread_s_slot_set.sigSetOK.connect(self.refresh_after_set)
+                thread_s_slot_set.sigSetOK.connect(self.set_resp_handler)
                 thread_s_slot_set.start()
                 thread_s_slot_set.exec()
 
-    def refresh_resp_handler(self, case, res):
+    def get_resp_handler(self, case, res):
         """Work Thread Get the Value and Send to refresh_resp_handler for displaying
                 update data mainly by rewriting antenna_bean and refresh display
                 change dimension in the mean time
@@ -304,15 +340,25 @@ class DeviceTab(QtWidgets.QWidget):
                 if self.typeComboBox.currentText() == RRUCmd.slot_type_str[0]:
                     self.slotValueLabel.setStyleSheet(NonQSSStyle.displayValueTempStyle)
                 self.warning("TDD Slot cannot be refreshed properly")
-        # TODO ADD
         self.display()
-        
+
+        if case == RRUCmd.DEBUG:
+            if self.debug_counter == 0:
+                self.freqValueLabel.setText("First")
+                self.debug_counter += 1
+            elif self.debug_counter == 1:
+                self.txGainValueLabel.setText("Second")
+                self.debug_counter += 1
+            elif self.debug_counter == 2:
+                self.rxGainValueLabel.setText("Third")
+                self.debug_counter += 1
+
     def refresh_freq(self):
         cmd = RRUCmd.get_frequency(self.parentWidget.get_option())
 
         thread_freq_get = WorkThread(self, RRUCmd.GET_FREQUENCY, cmd)
         thread_freq_get.sigConnectionOut.connect(self.slot_connection_out_signal)
-        thread_freq_get.sigGetRes.connect(self.refresh_resp_handler)
+        thread_freq_get.sigGetRes.connect(self.get_resp_handler)
         thread_freq_get.start()
         thread_freq_get.exec()
 
@@ -321,7 +367,7 @@ class DeviceTab(QtWidgets.QWidget):
 
         thread_tx_get = WorkThread(self, RRUCmd.GET_TX_ATTEN, cmd)
         thread_tx_get.sigConnectionOut.connect(self.slot_connection_out_signal)
-        thread_tx_get.sigGetRes.connect(self.refresh_resp_handler)
+        thread_tx_get.sigGetRes.connect(self.get_resp_handler)
         thread_tx_get.start()
         thread_tx_get.exec()
 
@@ -330,25 +376,25 @@ class DeviceTab(QtWidgets.QWidget):
 
         thread_rx_get = WorkThread(self, RRUCmd.GET_RX_GAIN, cmd)
         thread_rx_get.sigConnectionOut.connect(self.slot_connection_out_signal)
-        thread_rx_get.sigGetRes.connect(self.refresh_resp_handler)
+        thread_rx_get.sigGetRes.connect(self.get_resp_handler)
         thread_rx_get.start()
         thread_rx_get.exec()
 
     def refresh_s_slot(self):
         cmd = RRUCmd.get_s_slot(self.parentWidget.get_option(), self.parentWidget.get_ant_num())
-        
+
         thread_s_slot_get = WorkThread(self, RRUCmd.GET_S_SLOT, cmd)
         thread_s_slot_get.sigConnectionOut.connect(self.slot_connection_out_signal)
-        thread_s_slot_get.sigGetRes.connect(self.refresh_resp_handler)
+        thread_s_slot_get.sigGetRes.connect(self.get_resp_handler)
         thread_s_slot_get.start()
         thread_s_slot_get.exec()
 
     def refresh_tdd_slot(self):
         cmd = RRUCmd.get_tdd_slot(self.parentWidget.get_option(), self.parentWidget.get_ant_num())
-        
+
         thread_tdd_slot_get = WorkThread(self, RRUCmd.GET_TDD_SLOT, cmd)
         thread_tdd_slot_get.sigConnectionOut.connect(self.slot_connection_out_signal)
-        thread_tdd_slot_get.sigGetRes.connect(self.refresh_resp_handler)
+        thread_tdd_slot_get.sigGetRes.connect(self.get_resp_handler)
         thread_tdd_slot_get.start()
         thread_tdd_slot_get.exec()
 
@@ -373,8 +419,8 @@ class DeviceTab(QtWidgets.QWidget):
                 # self.refresh_s_slot()
                 # self.refresh_tdd_slot()
                 # TODO ADD
-            
-    def refresh_after_set(self, case, resp: str):
+
+    def set_resp_handler(self, case, resp: str):
         if case == RRUCmd.SET_FREQUENCY:
             if not RespFilter.resp_check(resp):
                 self.warning("Frequency cannot be set properly")
@@ -400,28 +446,27 @@ class DeviceTab(QtWidgets.QWidget):
                 self.warning("Special Slot cannot be set properly")
             else:
                 self.refresh_s_slot()
-        # TODO ADD
 
     def slot_connection_out_signal(self):
         self.connectionOutSignal.emit()
 
     def freq_back2normal(self):
-        self.freqEdit.setStyleSheet(valueEditStyle)
+        self.freqEdit.setStyleSheet(NonQSSStyle.valueEditStyle)
 
     def rx_back2normal(self):
         self.antenna_bean_arr[self.antenna_index].rxGainAttenuation2Set = self.rxGainEdit.text()
-        self.rxGainEdit.setStyleSheet(valueEditStyle)
+        self.rxGainEdit.setStyleSheet(NonQSSStyle.valueEditStyle)
 
     def tx_back2normal(self):
         self.antenna_bean_arr[self.antenna_index].txAttenuation2Set = self.txGainEdit.text()
-        self.txGainEdit.setStyleSheet(valueEditStyle)
+        self.txGainEdit.setStyleSheet(NonQSSStyle.valueEditStyle)
 
     def slot_back2normal(self):
         if self.typeComboBox.currentText() == RRUCmd.slot_type_str[0]:
             self.antenna_bean_arr[self.antenna_index].tddSlot2Set = self.slotEdit.text()
         elif self.typeComboBox.currentText() == RRUCmd.slot_type_str[1]:
             self.antenna_bean_arr[self.antenna_index].sSlot2Set = self.slotEdit.text()
-        self.slotEdit.setStyleSheet(valueEditStyle)
+        self.slotEdit.setStyleSheet(NonQSSStyle.valueEditStyle)
 
     def display_slot(self):
         self.slotEdit.textChanged.disconnect()
@@ -460,11 +505,17 @@ class DeviceTab(QtWidgets.QWidget):
         self.txGainEdit.setText(Antenna.not_none(self.antenna_bean_arr[self.antenna_index].txAttenuation2Set))
         # Slot
         self.display_slot()
-    # TODO ADD
 
     def refresh_ant_num(self):
         if TelRepository.telnet_instance.isTelnetLogined:
             self.display()
+
+    @staticmethod
+    def log_error(t_error: tuple):
+        s_error = ""
+        for i in t_error:
+            s_error += str(i) + " "
+        logging.error(s_error)
 
     def quick_refresh(self, cmd):
         if TelRepository.telnet_instance.isTelnetLogined:
