@@ -94,7 +94,7 @@ class TelnetWorker(QtCore.QRunnable):
                 elif self.case == RRUCmd.SET_IP_ADDR:
                     self.set_value(self.cmd)
             else:
-                if self.case == RRUCmd.DEBUG:
+                if self.case == RRUCmd.CMD_TYPE_DEBUG:
                     self._debug_test(self.cmd)
                 else:
                     self.signals.connectionLost.emit()
@@ -108,7 +108,13 @@ class TelnetWorker(QtCore.QRunnable):
             self.signals.finished.emit()
 
     def reboot(self, cmd):
-        pass
+        #   Execute and send Info to Sim-Console
+        self.signals.consoleDisplay.emit(WorkerSignals.TRAN_SIGNAL, self.cmd)
+
+        self.result = TelRepository.telnet_instance.execute_command(cmd)
+
+        res_display = RespFilter.trim(self.result)
+        self.signals.consoleDisplay.emit(WorkerSignals.RECV_SIGNAL, res_display)
 
     def version(self, cmd):
         pass

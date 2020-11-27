@@ -24,7 +24,7 @@ def main():
     main_wnd.resize(850, 570)
     main_wnd.show()
 
-    app.exec()
+    sys.exit(app.exec())
 
 
 if __name__ == '__main__':

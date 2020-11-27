@@ -1,6 +1,8 @@
 class RRUCmd:
 
-    DEBUG = -220
+    CMD_TYPE_DEBUG = -220
+    CMD_TYPE_SET = -200
+    CMD_TYPE_GET = -100
 
     FAIL = -1
     REBOOT = 0
@@ -40,8 +42,8 @@ class RRUCmd:
     slot_type_str = ['TDD', 'Special']
 
     @staticmethod
-    def reboot():
-        return ""
+    def reboot(cmdType):
+        return "rruAutoRun {cmdType}".format(cmdType=cmdType)
 
     @staticmethod
     def get_version():

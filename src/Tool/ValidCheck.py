@@ -35,6 +35,14 @@ class ValidCheck:
         return False
 
     @staticmethod
+    def reg_format(s_value: str):
+        try:
+            n = int(s_value, 16)
+            return '0x{:08x}'.format(n)
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
     def freq(option: str, s_value: str):
         """Check validity of Frequency input
         :option:    CMDType 0 for 2.6 GHz, 1 for 3.5 GHz, 2 for 4,9 GHz
@@ -115,10 +123,10 @@ class ValidCheck:
 
 
 def main():
-    rxGain2set = "0"
+    rxGain2set = "02222222222201"
     if True:
         # Transfer Unit
-        match = ValidCheck.transfer_attenuation(rxGain2set, RRUCmd.GET_TX_ATTEN)
+        match = ValidCheck.reg_format(rxGain2set)
     if match is not None:
         print(match)
     else:

@@ -1,5 +1,8 @@
 import re
 
+from src.Telnet.RRUCmd import RRUCmd
+from src.Tool.ValidCheck import ValidCheck
+
 
 class RespFilter:
     FREQUENCY_ASSERTION = 'freq:'
@@ -22,6 +25,8 @@ class RespFilter:
 
     @staticmethod
     def resp_check(resp):
+        if resp is None:
+            return False
         if RespFilter.CMD_FAIL not in resp:
             return True
         else:
@@ -85,14 +90,30 @@ class RespFilter:
 
 
 def main():
-    text = "CPRI status is not link up\r\nCMD OK"
+    text = "txAtten1:36000"
 
-    res = RespFilter.word_value_filter(text, RespFilter.CPRI_STATUS_ASSERTION)
+    res = RespFilter.value_filter_with_ant(text, RespFilter.TX_ATTEN_ASSERTION, 0)
 
     if res is not None:
         print(str(res.group()))
     else:
         print('Failed')
+
+    i = 0
+    if res is None:
+        if 0 == i:
+            i += 1
+        while res is None and i < 4:
+            res = RespFilter.value_filter_with_ant(text, RespFilter.TX_ATTEN_ASSERTION, i)
+            i += 1
+        i -= 1
+    else:
+        i = 0
+    if res is not None:
+        print(str(res.group()))
+        res = ValidCheck.transfer_attenuation(res.group(), RRUCmd.GET_TX_ATTEN)
+        print(res)
+        print(i)
 
 
 if __name__ == '__main__':

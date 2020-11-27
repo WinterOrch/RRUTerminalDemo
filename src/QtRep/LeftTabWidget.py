@@ -3,13 +3,12 @@ from PyQt5.QtWidgets import QListWidget, QStackedWidget
 from PyQt5.QtWidgets import QWidget
 from PyQt5.QtWidgets import QHBoxLayout
 
-from PyQt5.QtCore import QSize, Qt
+from PyQt5.QtCore import QSize, Qt, QThreadPool
 
 from src.QtRep.LoginWidget import LoginWidget
 from src.QtRep.OperateWidget import OperateWidget
 from src.QtRep.TerminalWidget import TerminalWidget
 from src.Telnet.TelRepository import TelRepository
-from src.Telnet.Telnet import Telnet
 
 
 class LeftTabWidget(QWidget):
@@ -94,5 +93,7 @@ class LeftTabWidget(QWidget):
             self.item.setTextAlignment(Qt.AlignCenter)
 
     def closeEvent(self, a0: QtGui.QCloseEvent) -> None:
-        if Telnet.isTelnetLogined:
-            TelRepository.telnet_instance.logout()
+        if self.loginWidget.isTelnetLogined:
+            self.settingWidget.axi_reg_setting.json_save()
+        QThreadPool.globalInstance().clear()
+        TelRepository.telnet_instance.terminate()

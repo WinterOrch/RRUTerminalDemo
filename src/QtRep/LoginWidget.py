@@ -1,20 +1,20 @@
 import os
 import logging
 
-from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtCore import pyqtSignal, QThreadPool
 from PyQt5.QtWidgets import QWidget
 
 from src.QtRep.NonQSSStyle import NonQSSStyle
 from src.Telnet import JsonRep
 from src.Telnet.RRUCmd import RRUCmd
 from src.Telnet.RespFilter import RespFilter
+from src.Telnet.Runnable.ConnectionMonitor import ConnectionMonitor
+from src.Telnet.Runnable.TelnetWorker import TelnetWorker, WorkerSignals
 from src.Telnet.TelRepository import TelRepository
 from src.Telnet.Telnet import Telnet
 
 from PyQt5 import QtWidgets
 
-from src.Telnet.Thread.MonitorThread import MonitorThread
-from src.Telnet.Thread.WorkThread import WorkThread
 from src.Tool.ValidCheck import ValidCheck
 
 valueEditStyle = "height: 22px"
@@ -42,10 +42,6 @@ class LoginWidget(QWidget):
             self.list_style = f.read()
 
         self.setStyleSheet(self.list_style)
-
-        '''Monitor Thread'''
-        self.monitorT = MonitorThread()
-        ''''''
 
         self._setup_ui()
         self._add_signal()
@@ -147,8 +143,6 @@ class LoginWidget(QWidget):
         self.userEdit.textChanged.connect(self.back_normal)
         self.hostEdit.textChanged.connect(self.back_normal)
 
-        self.monitorT.sinOut.connect(self.health_failure)
-
         self.setTabOrder(self.hostEdit, self.userEdit)
         self.setTabOrder(self.userEdit, self.passwordEdit)
 
@@ -189,7 +183,9 @@ class LoginWidget(QWidget):
 
             self.loginSignal.emit(True)
 
-            self.monitorT.start()
+            monitor_thread = ConnectionMonitor()
+            monitor_thread.signals.connectionLost.connect(self.health_failure)
+            QThreadPool.globalInstance().start(monitor_thread)
         else:
             self.loginButton.setStyleSheet("background-color: red; height: 90px")
             self.loginButton.setText('Failed')
@@ -278,7 +274,6 @@ class LoginWidget(QWidget):
     def _loose_login(self):
         self.loginSignal.emit(False)
         # self.ip_config_widget.setDisabled(True)
-        self.monitorT.quit()
         self.isTelnetLogined = False
         self.back_normal()
 
@@ -286,11 +281,11 @@ class LoginWidget(QWidget):
         if self.isTelnetLogined:
             cmd = RRUCmd.get_ipaddr("ipaddr")
 
-            thread_ip_addr_get = WorkThread(self, RRUCmd.GET_IP_ADDR, cmd)
-            thread_ip_addr_get.sigConnectionOut.connect(self.health_failure)
-            thread_ip_addr_get.sigGetRes.connect(self.refresh_resp_handler)
-            thread_ip_addr_get.start()
-            thread_ip_addr_get.exec()
+            thread = TelnetWorker(RRUCmd.GET_IP_ADDR, cmd)
+            thread.signals.connectionLost.connect(self.health_failure)
+            thread.signals.consoleDisplay.connect(self._console_slot)
+            thread.signals.result.connect(self.refresh_resp_handler)
+            QThreadPool.globalInstance().start(thread)
         else:
             msgBox = QtWidgets.QMessageBox()
 
@@ -320,11 +315,11 @@ class LoginWidget(QWidget):
             if ipaddr2set is not None:
                 cmd = RRUCmd.config_ipaddr("ipaddr", ipaddr2set.group())
 
-                thread_ip_addr_set = WorkThread(self, RRUCmd.SET_IP_ADDR, cmd)
-                thread_ip_addr_set.sigConnectionOut.connect(self.health_failure)
-                thread_ip_addr_set.sigSetOK.connect(self.set_handler)
-                thread_ip_addr_set.start()
-                thread_ip_addr_set.exec()
+                thread = TelnetWorker(RRUCmd.SET_IP_ADDR, cmd)
+                thread.signals.connectionLost.connect(self.health_failure)
+                thread.signals.consoleDisplay.connect(self._console_slot)
+                thread.signals.result.connect(self.set_handler)
+                QThreadPool.globalInstance().start(thread)
             else:
                 self.ipaddrEdit.setStyleSheet(NonQSSStyle.warningStyle)
         else:
@@ -335,6 +330,12 @@ class LoginWidget(QWidget):
             msgBox.setText('Login before Setting the IP Address')
 
             msgBox.exec()
+
+    def _console_slot(self, case, cmd):
+        if case == WorkerSignals.TRAN_SIGNAL:
+            self.ipTranSignal.emit(cmd)
+        elif case == WorkerSignals.RECV_SIGNAL:
+            self.ipRecvSignal.emit(cmd)
 
     def ipaddr_edit_back2normal(self):
         self.ipaddrEdit.setStyleSheet(NonQSSStyle.displayValueStyle)

@@ -10,11 +10,12 @@ from src.Telnet.RRUCmd import RRUCmd
 from src.Telnet.RespFilter import RespFilter
 from src.Telnet.Runnable.TelnetWorker import TelnetWorker, WorkerSignals
 from src.Telnet.TelRepository import TelRepository
-from src.Telnet.Thread.WorkThread import WorkThread
 from src.Tool.ValidCheck import ValidCheck
 
 pubSpacing = 10
 mainSpacing = 2
+
+TEST = False
 
 
 class DeviceTab(QtWidgets.QWidget):
@@ -150,15 +151,18 @@ class DeviceTab(QtWidgets.QWidget):
         mainLayout.addWidget(slot_setting_layout)
         mainLayout.addSpacing(mainSpacing)
         self.setLayout(mainLayout)
-        
+
     def _init_bean(self):
         self.antenna_bean_arr = []
         for i in range(max(RRUCmd.ant_num)):
             self.antenna_bean_arr.append(Antenna())
         self.antenna_index = 0
-        
+
     def add_signal(self):
-        self.setFreqButton.clicked.connect(self.send)
+        if TEST:
+            self.setFreqButton.clicked.connect(self.test)
+        else:
+            self.setFreqButton.clicked.connect(self.send)
         self.typeComboBox.currentIndexChanged.connect(self.display_slot)
         self.setButton.clicked.connect(self.set_slot)
 
@@ -182,22 +186,35 @@ class DeviceTab(QtWidgets.QWidget):
         self.set_tx_gain()
         self.set_rx_gain()
 
+    def test(self):
+        text = "txAtten0:36000 (mdB)"
+        self.get_resp_handler(RRUCmd.GET_TX_ATTEN, text)
+        self.display()
+        text = "rxGain0:200 (mdB)"
+        self.get_resp_handler(RRUCmd.GET_RX_GAIN, text)
+        self.display()
+
     def _debug_send(self):
         cmd = "DEBUG"
 
-        thread = TelnetWorker(RRUCmd.DEBUG, cmd)
+        thread = TelnetWorker(RRUCmd.CMD_TYPE_DEBUG, cmd)
         thread.signals.consoleDisplay.connect(self._console_slot)
         thread.signals.connectionLost.connect(self.slot_connection_out_signal)
         thread.signals.error.connect(self.log_error)
         thread.signals.result.connect(self.get_resp_handler)
         QThreadPool.globalInstance().start(thread)
 
-    def _process_get(self, cmd):
-        thread = TelnetWorker(RRUCmd.DEBUG, cmd)
+    def _process_cmd(self, cmd_type: int, cmd_case: int, cmd: str):
+        thread = TelnetWorker(cmd_case, cmd)
         thread.signals.consoleDisplay.connect(self._console_slot)
         thread.signals.connectionLost.connect(self.slot_connection_out_signal)
         thread.signals.error.connect(self.log_error)
-        thread.signals.result.connect(self.get_resp_handler)
+
+        if cmd_type == RRUCmd.CMD_TYPE_GET:
+            thread.signals.result.connect(self.get_resp_handler)
+        elif cmd_type == RRUCmd.CMD_TYPE_SET:
+            thread.signals.result.connect(self.set_resp_handler)
+
         QThreadPool.globalInstance().start(thread)
 
     def set_freq(self):
@@ -207,11 +224,7 @@ class DeviceTab(QtWidgets.QWidget):
                 self.freqValueLabel.setStyleSheet(NonQSSStyle.displayValueTempStyle)
                 cmd = RRUCmd.config_frequency(self.parentWidget.get_option(), freq2set)
 
-                thread_freq_set = WorkThread(self, RRUCmd.SET_FREQUENCY, cmd)
-                thread_freq_set.sigConnectionOut.connect(self.slot_connection_out_signal)
-                thread_freq_set.sigSetOK.connect(self.set_resp_handler)
-                thread_freq_set.start()
-                thread_freq_set.exec()
+                self._process_cmd(RRUCmd.CMD_TYPE_SET, RRUCmd.SET_FREQUENCY, cmd)
             else:
                 self.freqEdit.setStyleSheet(NonQSSStyle.warningStyle)
 
@@ -229,11 +242,7 @@ class DeviceTab(QtWidgets.QWidget):
                 cmd = RRUCmd.set_rx_gain(self.parentWidget.get_option(), self.parentWidget.get_ant_num(), match.group())
                 self.antenna_bean_arr[self.antenna_index].rxGainAttenuationOutDated = True
 
-                thread_rx_gain_set = WorkThread(self, RRUCmd.SET_RX_GAIN, cmd)
-                thread_rx_gain_set.sigConnectionOut.connect(self.slot_connection_out_signal)
-                thread_rx_gain_set.sigSetOK.connect(self.set_resp_handler)
-                thread_rx_gain_set.start()
-                thread_rx_gain_set.exec()
+                self._process_cmd(RRUCmd.CMD_TYPE_SET, RRUCmd.SET_RX_GAIN, cmd)
             else:
                 self.rxGainEdit.setStyleSheet(NonQSSStyle.warningStyle)
 
@@ -248,11 +257,7 @@ class DeviceTab(QtWidgets.QWidget):
                 cmd = RRUCmd.set_tx_gain(self.parentWidget.get_option(), self.parentWidget.get_ant_num(), txGain2set)
                 self.antenna_bean_arr[self.antenna_index].txAttenuationOutDated = True
 
-                thread_tx_atten_set = WorkThread(self, RRUCmd.SET_TX_ATTEN, cmd)
-                thread_tx_atten_set.sigConnectionOut.connect(self.slot_connection_out_signal)
-                thread_tx_atten_set.sigSetOK.connect(self.set_resp_handler)
-                thread_tx_atten_set.start()
-                thread_tx_atten_set.exec()
+                self._process_cmd(RRUCmd.CMD_TYPE_SET, RRUCmd.SET_TX_ATTEN, cmd)
             else:
                 self.txGainEdit.setStyleSheet(NonQSSStyle.warningStyle)
 
@@ -265,20 +270,12 @@ class DeviceTab(QtWidgets.QWidget):
                 cmd = RRUCmd.set_tdd_slot(self.parentWidget.get_option(), self.parentWidget.get_ant_num(), slot2set)
                 self.antenna_bean_arr[self.antenna_index].tddSlotOutDated = True
 
-                thread_tdd_slot_set = WorkThread(self, RRUCmd.SET_TDD_SLOT, cmd)
-                thread_tdd_slot_set.sigConnectionOut.connect(self.slot_connection_out_signal)
-                thread_tdd_slot_set.sigSetOK.connect(self.set_resp_handler)
-                thread_tdd_slot_set.start()
-                thread_tdd_slot_set.exec()
+                self._process_cmd(RRUCmd.CMD_TYPE_SET, RRUCmd.SET_TDD_SLOT, cmd)
             elif self.typeComboBox.currentText() == RRUCmd.slot_type_str[1] and slot2set != self.slotValueLabel.text():
                 cmd = RRUCmd.set_s_slot(self.parentWidget.get_option(), self.parentWidget.get_ant_num(), slot2set)
                 self.antenna_bean_arr[self.antenna_index].sSlotOutDated = True
 
-                thread_s_slot_set = WorkThread(self, RRUCmd.SET_S_SLOT, cmd)
-                thread_s_slot_set.sigConnectionOut.connect(self.slot_connection_out_signal)
-                thread_s_slot_set.sigSetOK.connect(self.set_resp_handler)
-                thread_s_slot_set.start()
-                thread_s_slot_set.exec()
+                self._process_cmd(RRUCmd.CMD_TYPE_SET, RRUCmd.SET_S_SLOT, cmd)
 
     def get_resp_handler(self, case, res):
         """Work Thread Get the Value and Send to refresh_resp_handler for displaying
@@ -289,34 +286,68 @@ class DeviceTab(QtWidgets.QWidget):
             value = RespFilter.value_filter(res, RespFilter.FREQUENCY_ASSERTION)
             if value is not None:
                 self.freqValueLabel.setText(str(value.group()))
+                logging.debug("FREQ GET AS" + str(value.group()))
                 self.freqValueLabel.setStyleSheet(NonQSSStyle.displayValueStyle)
                 self.freqEdit.setText(str(value.group()))
+                self.display()
+                if not TEST:
+                    self.initialize_update()
             else:
                 self.freqValueLabel.setStyleSheet(NonQSSStyle.displayValueTempStyle)
                 self.warning("Frequency cannot be refreshed properly")
         elif case == RRUCmd.GET_TX_ATTEN:
             value = RespFilter.value_filter_with_ant(res, RespFilter.TX_ATTEN_ASSERTION, self.antenna_index)
+            i = 0
+            if value is None:
+                if self.antenna_index == i:
+                    i += 1
+                while value is None and i < RRUCmd.ant_num[self.parentWidget.option]:
+                    value = RespFilter.value_filter_with_ant(res, RespFilter.TX_ATTEN_ASSERTION, i)
+                    i += 1
+                i -= 1
+            else:
+                i = self.antenna_index
             if value is not None:
                 res = str(value.group())
                 if self.mod_dimension:
                     # Transfer Unit
                     res = ValidCheck.transfer_attenuation(res, RRUCmd.GET_TX_ATTEN)
-                self.antenna_bean_arr[self.antenna_index].txAttenuation = res
-                self.antenna_bean_arr[self.antenna_index].txAttenuation2Set = res
-                self.antenna_bean_arr[self.antenna_index].txAttenuationOutDated = False
+                self.antenna_bean_arr[i].txAttenuation = res
+                logging.debug("TX GET AS" + str(value.group()) + "For Ant" + str(i) + "TRAN TO" + res)
+                self.antenna_bean_arr[i].txAttenuation2Set = res
+                self.antenna_bean_arr[i].txAttenuationOutDated = False
+                self.antenna_bean_arr[i].txAttenuationInitialized = True
+                self.display()
+                if not TEST:
+                    self.initialize_update()
             else:
                 self.txGainValueLabel.setStyleSheet(NonQSSStyle.displayValueTempStyle)
                 self.warning("TX's attenuation cannot be refreshed properly")
         elif case == RRUCmd.GET_RX_GAIN:
             value = RespFilter.value_filter_with_ant(res, RespFilter.RX_GAIN_ASSERTION, self.antenna_index)
+            i = 0
+            if value is None:
+                if self.antenna_index == i:
+                    i += 1
+                while value is None and i < RRUCmd.ant_num[self.parentWidget.option]:
+                    value = RespFilter.value_filter_with_ant(res, RespFilter.RX_GAIN_ASSERTION, i)
+                    i += 1
+                i -= 1
+            else:
+                i = self.antenna_index
             if value is not None:
                 res = str(value.group())
                 if self.mod_dimension:
                     # Transfer Unit
                     res = ValidCheck.transfer_attenuation(res, RRUCmd.GET_RX_GAIN)
-                self.antenna_bean_arr[self.antenna_index].rxGainAttenuation = res
-                self.antenna_bean_arr[self.antenna_index].rxGainAttenuation2Set = res
-                self.antenna_bean_arr[self.antenna_index].rxGainAttenuationOutDated = False
+                self.antenna_bean_arr[i].rxGainAttenuation = res
+                logging.debug("RX GET AS" + str(value.group()) + "For Ant" + str(i) + "TRAN TO" + res)
+                self.antenna_bean_arr[i].rxGainAttenuation2Set = res
+                self.antenna_bean_arr[i].rxGainAttenuationOutDated = False
+                self.antenna_bean_arr[i].rxGainAttenuationInitialized = True
+                self.display()
+                if not TEST:
+                    self.initialize_update()
             else:
                 self.rxGainValueLabel.setStyleSheet(NonQSSStyle.displayValueTempStyle)
                 self.warning("RX's Gain attenuation cannot be refreshed properly")
@@ -326,6 +357,7 @@ class DeviceTab(QtWidgets.QWidget):
                 self.antenna_bean_arr[self.antenna_index].sSlot = str(value.group())
                 self.antenna_bean_arr[self.antenna_index].sSlot2Set = str(value.group())
                 self.antenna_bean_arr[self.antenna_index].sSlotOutDated = False
+                self.display()
             else:
                 if self.typeComboBox.currentText() == RRUCmd.slot_type_str[1]:
                     self.slotValueLabel.setStyleSheet(NonQSSStyle.displayValueTempStyle)
@@ -336,67 +368,51 @@ class DeviceTab(QtWidgets.QWidget):
                 self.antenna_bean_arr[self.antenna_index].tddSlot = str(value.group())
                 self.antenna_bean_arr[self.antenna_index].tddSlot2Set = str(value.group())
                 self.antenna_bean_arr[self.antenna_index].tddSlotOutDated = False
+                self.display()
             else:
                 if self.typeComboBox.currentText() == RRUCmd.slot_type_str[0]:
                     self.slotValueLabel.setStyleSheet(NonQSSStyle.displayValueTempStyle)
                 self.warning("TDD Slot cannot be refreshed properly")
-        self.display()
 
-        if case == RRUCmd.DEBUG:
-            if self.debug_counter == 0:
-                self.freqValueLabel.setText("First")
-                self.debug_counter += 1
-            elif self.debug_counter == 1:
-                self.txGainValueLabel.setText("Second")
-                self.debug_counter += 1
-            elif self.debug_counter == 2:
-                self.rxGainValueLabel.setText("Third")
-                self.debug_counter += 1
+    def initialize_update(self):
+        """在初始化自动刷新过程中持续刷新不同天线的收发增益
+        每次刷新完收或发增益后都会触发这一方法，以检查是否所有天线的收发增益都经过了初始化
+        """
+        for i in range(RRUCmd.ant_num[self.parentWidget.option]):
+            if not self.antenna_bean_arr[i].txAttenuationInitialized:
+                cmd = RRUCmd.get_tx_gain(self.parentWidget.get_option(), str(i))
+                self._process_cmd(RRUCmd.CMD_TYPE_GET, RRUCmd.GET_TX_ATTEN, cmd)
+                break
+            elif not self.antenna_bean_arr[i].rxGainAttenuationInitialized:
+                cmd = RRUCmd.get_rx_gain(self.parentWidget.get_option(), str(i))
+                self._process_cmd(RRUCmd.CMD_TYPE_GET, RRUCmd.GET_RX_GAIN, cmd)
+                break
+            # TODO
 
     def refresh_freq(self):
         cmd = RRUCmd.get_frequency(self.parentWidget.get_option())
 
-        thread_freq_get = WorkThread(self, RRUCmd.GET_FREQUENCY, cmd)
-        thread_freq_get.sigConnectionOut.connect(self.slot_connection_out_signal)
-        thread_freq_get.sigGetRes.connect(self.get_resp_handler)
-        thread_freq_get.start()
-        thread_freq_get.exec()
+        self._process_cmd(RRUCmd.CMD_TYPE_GET, RRUCmd.GET_FREQUENCY, cmd)
 
     def refresh_tx_gain(self):
         cmd = RRUCmd.get_tx_gain(self.parentWidget.get_option(), self.parentWidget.get_ant_num())
 
-        thread_tx_get = WorkThread(self, RRUCmd.GET_TX_ATTEN, cmd)
-        thread_tx_get.sigConnectionOut.connect(self.slot_connection_out_signal)
-        thread_tx_get.sigGetRes.connect(self.get_resp_handler)
-        thread_tx_get.start()
-        thread_tx_get.exec()
+        self._process_cmd(RRUCmd.CMD_TYPE_GET, RRUCmd.GET_TX_ATTEN, cmd)
 
     def refresh_rx_gain(self):
         cmd = RRUCmd.get_rx_gain(self.parentWidget.get_option(), self.parentWidget.get_ant_num())
 
-        thread_rx_get = WorkThread(self, RRUCmd.GET_RX_GAIN, cmd)
-        thread_rx_get.sigConnectionOut.connect(self.slot_connection_out_signal)
-        thread_rx_get.sigGetRes.connect(self.get_resp_handler)
-        thread_rx_get.start()
-        thread_rx_get.exec()
+        self._process_cmd(RRUCmd.CMD_TYPE_GET, RRUCmd.GET_RX_GAIN, cmd)
 
     def refresh_s_slot(self):
         cmd = RRUCmd.get_s_slot(self.parentWidget.get_option(), self.parentWidget.get_ant_num())
 
-        thread_s_slot_get = WorkThread(self, RRUCmd.GET_S_SLOT, cmd)
-        thread_s_slot_get.sigConnectionOut.connect(self.slot_connection_out_signal)
-        thread_s_slot_get.sigGetRes.connect(self.get_resp_handler)
-        thread_s_slot_get.start()
-        thread_s_slot_get.exec()
+        self._process_cmd(RRUCmd.CMD_TYPE_GET, RRUCmd.GET_S_SLOT, cmd)
 
     def refresh_tdd_slot(self):
         cmd = RRUCmd.get_tdd_slot(self.parentWidget.get_option(), self.parentWidget.get_ant_num())
 
-        thread_tdd_slot_get = WorkThread(self, RRUCmd.GET_TDD_SLOT, cmd)
-        thread_tdd_slot_get.sigConnectionOut.connect(self.slot_connection_out_signal)
-        thread_tdd_slot_get.sigGetRes.connect(self.get_resp_handler)
-        thread_tdd_slot_get.start()
-        thread_tdd_slot_get.exec()
+        self._process_cmd(RRUCmd.CMD_TYPE_GET, RRUCmd.GET_TDD_SLOT, cmd)
 
     def warning(self, info):
         self.warningSignal.emit(info)
@@ -414,11 +430,10 @@ class DeviceTab(QtWidgets.QWidget):
         if TelRepository.telnet_instance.isTelnetLogined:
             if self.auto_fresh:
                 self.refresh_freq()
-                # self.refresh_tx_gain()
-                # self.refresh_rx_gain()
-                # self.refresh_s_slot()
-                # self.refresh_tdd_slot()
-                # TODO ADD
+
+                self.refresh_tx_gain()
+                # TODO ADD 不同天线的数值刷新仅需触发一次，之后会通过 initialize_update 方法自动刷新，遇到失败后会中断，须手动刷新，
+                #  因此添加新功能时，为了实现自动刷新需要在 intialize_update 和 get_resp_handler 中进行添加和修改而不是这里
 
     def set_resp_handler(self, case, resp: str):
         if case == RRUCmd.SET_FREQUENCY:

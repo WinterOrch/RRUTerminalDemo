@@ -20,9 +20,11 @@ class Antenna:
         self.txAttenuation = Antenna.RRU_NONE
         self.txAttenuation2Set = Antenna.RRU_NONE
         self.txAttenuationOutDated = True
+        self.txAttenuationInitialized = False
         self.rxGainAttenuation = Antenna.RRU_NONE
         self.rxGainAttenuation2Set = Antenna.RRU_NONE
         self.rxGainAttenuationOutDated = True
+        self.rxGainAttenuationInitialized = False
 
         self.dlFrameOffset = Antenna.RRU_NONE
         self.dlFrameOffset2Set = Antenna.RRU_NONE

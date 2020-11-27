@@ -2,6 +2,8 @@ import telnetlib
 import logging
 import time
 
+from src.Telnet.Config.TelnetConfig import TelnetConfig
+
 return_symbol = b'\r'
 
 
@@ -44,7 +46,7 @@ class Telnet:
             print('Try to open Telnet')
             logging.debug('Try to open Telnet %s' % host_ip)
             self.locked = True
-            self.tn.open(host_ip, port=23, timeout=self.timeout)
+            self.tn.open(host_ip, port=23, timeout=TelnetConfig.LoginTimeOut)
             self.isTelnetOpened = True
             logging.debug('%s Telnet Opened' % host_ip)
         except Exception as argument:
@@ -54,7 +56,7 @@ class Telnet:
 
         if username is not None and len(username) != 0:
             logging.debug('Try to login as %s' % username)
-            self.tn.read_until(b'login:', timeout=self.timeout)
+            self.tn.read_until(b'login:', timeout=TelnetConfig.LoginTimeOut)
             self.tn.write(username.encode('ascii') + b'\r')
             logging.debug('Username input')
         else:
@@ -63,7 +65,7 @@ class Telnet:
 
         if password is not None and len(password) != 0:
             logging.debug('Try to input password')
-            self.tn.read_until(b'password:', timeout=self.timeout)
+            self.tn.read_until(b'password:', timeout=TelnetConfig.LoginTimeOut)
             logging.debug('Find assertion for password')
             if len(password) == 0:
                 self.tn.write(b'\r')
@@ -102,6 +104,10 @@ class Telnet:
             if self.isTelnetOpened:
                 self.tn.close()
             return False
+
+    def terminate_all(self):
+        logging.info("Shut down")
+        self.tn.close()
 
     def logout(self):
         self.lock_check()
@@ -151,7 +157,7 @@ class Telnet:
                 logging.debug('Tap Starts Here')
 
                 self.tn.write(return_symbol)
-                time.sleep(self.delay)
+                time.sleep(TelnetConfig.TapDelay)
                 response = self._get_result()
 
                 if self.loginedUserName in response:
@@ -173,6 +179,7 @@ class Telnet:
             return False
 
     def terminate(self):
+        logging.info("Shut down")
         try:
             self.tn.close()
         finally:
@@ -182,14 +189,18 @@ class Telnet:
     def get_warning(self):
         return self.warning
 
-    def _get_result(self):
+    def _get_result(self, timeout=TelnetConfig.ReadTimeOut):
         result = str()
         a = []
         while True:
-            b, c, d = self.tn.expect(a, timeout=self.delay)
-            result = result + str(d, encoding="gbk")
-            if b == 0:
-                self.tn.write(r' ')
-            else:
+            try:
+                b, c, d = self.tn.expect(a, timeout=timeout)
+                result = result + str(d, encoding="gbk")
+                if b == 0:
+                    self.tn.write(r' ')
+                else:
+                    break
+            except Exception as argument:
+                logging.error(argument)
                 break
         return result
